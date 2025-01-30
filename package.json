@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "build": "node build.js",
+    "build:all": "npm run build checkout && npm run build webhook && npm run build sync"
+  },
+  "dependencies": {
+    "stripe": "^14.4.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.126",
+    "@types/node": "^20.9.0",
+    "esbuild": "^0.19.5",
+    "typescript": "^5.2.2"
+  }
+}
