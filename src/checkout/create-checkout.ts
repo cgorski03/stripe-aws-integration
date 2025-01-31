@@ -6,7 +6,7 @@ import { DynamoDB } from 'aws-sdk';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const dynamodb = new DynamoDB.DocumentClient();
 
-const TABLE_NAME = (process.env.TABLE_NAME as string);
+const CUSTOMER_TABLE = (process.env.CUSTOMER_TABLE as string);
 
 export const handler = async (
   event: APIGatewayProxyEvent
@@ -34,7 +34,7 @@ export const handler = async (
     let stripeCustomerId: string | null = null;
     try {
       const { Item } = await dynamodb.get({
-        TableName: TABLE_NAME,
+        TableName: CUSTOMER_TABLE,
         Key: {
           userId: user.sub
         }
@@ -72,7 +72,7 @@ export const handler = async (
       console.log('Storing new customer ID in DynamoDB');
       // Store the customer ID
       await dynamodb.put({
-        TableName: TABLE_NAME,
+        TableName: CUSTOMER_TABLE,
         Item: {
           userId: user.sub,
           stripeCustomerId: newCustomer.id,

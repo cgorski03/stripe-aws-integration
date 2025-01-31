@@ -4,6 +4,7 @@
     "build:all": "npm run build checkout && npm run build webhook && npm run build sync"
   },
   "dependencies": {
+    "aws-cdk-lib": "^2.177.0",
     "aws-sdk": "^2.1692.0",
     "stripe": "^14.4.0"
   },
