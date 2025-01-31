@@ -26,7 +26,7 @@ async function updateApiRoutes() {
   // Update checkout route
   await apigateway.updateIntegration({
     restApiId: process.env.API_ID!,
-    resourceId: 'sub/checkout',
+    resourceId: 'subscription/checkout',
     httpMethod: 'POST',
     patchOperations: [
       {
@@ -40,7 +40,7 @@ async function updateApiRoutes() {
   // Update webhook route
   await apigateway.updateIntegration({
     restApiId: process.env.API_ID!,
-    resourceId: 'sub/webhook'!,
+    resourceId: 'subscription/webhook'!,
     httpMethod: 'POST',
     patchOperations: [
       {
@@ -53,7 +53,7 @@ async function updateApiRoutes() {
 
   await apigateway.updateIntegration({
     restApiId: process.env.API_ID!,
-    resourceId: 'sub/sync'!,
+    resourceId: 'subscription/sync'!,
     httpMethod: 'POST',
     patchOperations: [
       {

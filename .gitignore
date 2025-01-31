@@ -1,2 +1,26 @@
+# Dependencies
 node_modules/
+
+# Build outputs
+dist/
+cdk.out/
+
+# Environment variables
 .env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+
+# AWS
+.aws-sam/
+.cdk.staging/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
