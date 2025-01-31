@@ -35,6 +35,11 @@ async function buildFunctions() {
       entryPoints: ['src/sync/sync-stripe-data.ts'],
       outfile: 'dist/sync/sync-stripe-data.js',
     });
+    await esbuild.build({
+      ...baseConfig,
+      entryPoints: ['src/success/success-stripe-sync.ts'],
+      outfile: 'dist/success/success-stripe-sync.js',
+    });
 
     console.log('Build completed successfully');
   } catch (error) {

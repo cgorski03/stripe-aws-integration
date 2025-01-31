@@ -9,7 +9,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     
     // Get stripeCustomerId from DynamoDB using userId
     const { Payload } = await lambda.invoke({
-      FunctionName: process.env.SYNC_FUNCTION_NAME!,
+      FunctionName: process.env.STRIPE_SYNC_FUNCTION_NAME!,
       Payload: JSON.stringify({
         stripeCustomerId: user.sub // Pass Cognito user ID
       })

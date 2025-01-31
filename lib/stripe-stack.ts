@@ -43,12 +43,21 @@ export class StripeFunctionsStack extends cdk.Stack {
         STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
         STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET!,
         STRIPE_SYNC_FUNCTION_NAME: syncFunction.functionName
-    },
+      },
+    });
+    const successSyncFunction = new lambda.Function(this, 'StripeSuccessSync', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'success/success-stripe-sync.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '../dist/success')),
+      environment: {
+        STRIPE_SYNC_FUNCTION_NAME: syncFunction.functionName
+      },
     });
     // Allow webhook to invoke sync
     syncFunction.grantInvoke(webhookFunction);
+    syncFunction.grantInvoke(successSyncFunction);
     this.checkoutFunction = checkoutFunction.functionArn;
     this.webhookFunction = webhookFunction.functionArn;
-    this.syncFunction = syncFunction.functionArn;
+    this.syncFunction = successSyncFunction.functionArn;
   }
 }
