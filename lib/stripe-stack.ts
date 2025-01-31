@@ -1,9 +1,12 @@
 // lib/stripe-stack.ts
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as iam from 'aws-cdk-lib/aws-iam';
 
 export class StripeFunctionsStack extends cdk.Stack {
+  public readonly checkoutFunction: string;
+  public readonly webhookFunction: string;
+  public readonly syncFunction: string;
+
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -42,21 +45,8 @@ export class StripeFunctionsStack extends cdk.Stack {
 
     // Allow webhook to invoke sync
     syncFunction.grantInvoke(webhookFunction);
-
-    // Output the ARNs for use in your API Gateway
-    new cdk.CfnOutput(this, 'CheckoutFunctionArn', {
-      value: checkoutFunction.functionArn,
-      description: 'Stripe Checkout Lambda Function ARN',
-    });
-
-    new cdk.CfnOutput(this, 'WebhookFunctionArn', {
-      value: webhookFunction.functionArn,
-      description: 'Stripe Webhook Lambda Function ARN',
-    });
-
-    new cdk.CfnOutput(this, 'SyncFunctionArn', {
-      value: syncFunction.functionArn,
-      description: 'Stripe Sync Lambda Function ARN',
-    });
+    this.checkoutFunction = checkoutFunction.functionArn;
+    this.webhookFunction = webhookFunction.functionArn;
+    this.syncFunction = syncFunction.functionArn;
   }
 }
