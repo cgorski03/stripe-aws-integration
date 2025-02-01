@@ -59,5 +59,19 @@ export class StripeFunctionsStack extends cdk.Stack {
     this.checkoutFunction = checkoutFunction.functionArn;
     this.webhookFunction = webhookFunction.functionArn;
     this.syncFunction = successSyncFunction.functionArn;
+    new cdk.CfnOutput(this, 'CheckoutFunction', {
+      value: this.checkoutFunction,
+      exportName: 'checkoutFunction'
+    });
+
+    new cdk.CfnOutput(this, 'WebhookFunction', {
+      value: this.webhookFunction,
+      exportName: 'webhookFunction'
+    });
+
+    new cdk.CfnOutput(this, 'SyncFunction', {
+      value: this.syncFunction,
+      exportName: 'syncFunction'
+    });
   }
 }
