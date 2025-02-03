@@ -1,10 +1,16 @@
 // sync-stripe-data.ts
 import { Stripe } from 'stripe';
-import { DynamoDB } from 'aws-sdk';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { 
+  DynamoDBDocumentClient, 
+  QueryCommand,
+  PutCommand 
+} from '@aws-sdk/lib-dynamodb';
 import type { Handler } from 'aws-lambda';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const dynamodb = new DynamoDB.DocumentClient();
+const client = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(client);
 
 const CUSTOMER_TABLE = (process.env.CUSTOMER_TABLE as string);
 
@@ -31,6 +37,7 @@ type LambdaResponse = {
   data?: StripeSubscriptionData;
   error?: string;
 };
+
 export const handler: Handler<SyncStripeEvent, LambdaResponse> = async (event) => {
   console.log('Starting stripe data sync for customer:', event.stripeCustomerId);
   
@@ -43,14 +50,14 @@ export const handler: Handler<SyncStripeEvent, LambdaResponse> = async (event) =
     }
 
     console.log('Querying DynamoDB for existing user record');
-    const { Items } = await dynamodb.query({
+    const { Items } = await docClient.send(new QueryCommand({
       TableName: CUSTOMER_TABLE,
       IndexName: 'StripeCustomerIndex',
       KeyConditionExpression: 'stripeCustomerId = :stripeId',
       ExpressionAttributeValues: {
         ':stripeId': stripeCustomerId
       }
-    }).promise();
+    }));
 
     console.log('DynamoDB query result:', {
       found: !!Items?.length,
@@ -108,7 +115,7 @@ export const handler: Handler<SyncStripeEvent, LambdaResponse> = async (event) =
     }
 
     console.log('Updating DynamoDB with latest subscription data');
-    await dynamodb.put({
+    await docClient.send(new PutCommand({
       TableName: CUSTOMER_TABLE,
       Item: {
         userId: existingUserId,        // Preserve existing userId
@@ -116,7 +123,7 @@ export const handler: Handler<SyncStripeEvent, LambdaResponse> = async (event) =
         ...subData,
         updatedAt: new Date().toISOString(),
       },
-    }).promise();
+    }));
 
     console.log('Sync completed successfully');
     return {

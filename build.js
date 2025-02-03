@@ -8,7 +8,14 @@ const baseConfig = {
   minify: true,
   platform: 'node',
   target: 'node18',
-  external: ['aws-sdk'], // AWS SDK is provided by Lambda
+  external: [
+    '@aws-sdk/client-dynamodb',
+    '@aws-sdk/lib-dynamodb',
+    '@aws-sdk/client-lambda',
+    '@aws-sdk/client-apigateway',
+    '@aws-sdk/client-cloudformation',
+    // Add any other AWS SDK v3 packages you're using
+  ],
   format: 'cjs',
 };
 

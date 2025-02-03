@@ -1,10 +1,16 @@
 // create-checkout.ts
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import Stripe from 'stripe';
-import { DynamoDB } from 'aws-sdk';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { 
+  DynamoDBDocumentClient, 
+  GetCommand, 
+  PutCommand 
+} from '@aws-sdk/lib-dynamodb';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const dynamodb = new DynamoDB.DocumentClient();
+const client = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(client);
 
 const CUSTOMER_TABLE = (process.env.CUSTOMER_TABLE as string);
 
@@ -22,7 +28,6 @@ export const handler = async (
     const user = event.requestContext.authorizer?.claims;
     if (!user?.sub || !user?.email) {
       console.log('Unauthorized request - missing user claims');
-      // We only want logged in users to be able to create checkout sessions
       return {
         statusCode: 401,
         body: JSON.stringify({ error: 'Unauthorized' })
@@ -33,12 +38,13 @@ export const handler = async (
     // Get stripeCustomerId from DynamoDB
     let stripeCustomerId: string | null = null;
     try {
-      const { Item } = await dynamodb.get({
+      const { Item } = await docClient.send(new GetCommand({
         TableName: CUSTOMER_TABLE,
         Key: {
           userId: user.sub
         }
-      }).promise();
+      }));
+      
       console.log('DynamoDB lookup result:', { 
         hasCustomerId: !!Item?.stripeCustomerId,
         email: Item?.email 
@@ -51,7 +57,6 @@ export const handler = async (
     // Create new Stripe customer if doesn't exist
     if (!stripeCustomerId) {
       console.log('Creating new Stripe customer for user:', user.sub);
-      // This line takes 3-4 seconds, and it i scrucial so we have to wait
       let newCustomer: Stripe.Customer;
       try {
         newCustomer = await stripe.customers.create({
@@ -71,7 +76,7 @@ export const handler = async (
 
       console.log('Storing new customer ID in DynamoDB');
       // Store the customer ID
-      await dynamodb.put({
+      await docClient.send(new PutCommand({
         TableName: CUSTOMER_TABLE,
         Item: {
           userId: user.sub,
@@ -79,7 +84,7 @@ export const handler = async (
           email: user.email,
           createdAt: new Date().toISOString()
         }
-      }).promise();
+      }));
 
       stripeCustomerId = newCustomer.id;
     }
