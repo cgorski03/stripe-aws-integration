@@ -2,6 +2,9 @@
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import path from 'path';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 export class StripeFunctionsStack extends cdk.Stack {
   public readonly checkoutFunction: string;
