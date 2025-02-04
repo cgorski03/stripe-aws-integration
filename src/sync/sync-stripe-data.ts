@@ -52,7 +52,7 @@ export const handler: Handler<SyncStripeEvent, LambdaResponse> = async (event) =
     console.log('Querying DynamoDB for existing user record');
     const { Items } = await docClient.send(new QueryCommand({
       TableName: CUSTOMER_TABLE,
-      IndexName: 'StripeCustomerIndex',
+      IndexName: 'stripeCustomerId-index',
       KeyConditionExpression: 'stripeCustomerId = :stripeId',
       ExpressionAttributeValues: {
         ':stripeId': stripeCustomerId
