@@ -11,7 +11,8 @@ const baseConfig = {
     '@aws-sdk/client-lambda',
     '@aws-sdk/client-apigateway',
     '@aws-sdk/client-cloudformation',
-    '@aws-sdk/client-lambda'
+    '@aws-sdk/client-lambda',
+    '@aws-sdk/client-cognito-identity-provider',
   ],
   format: 'cjs',
 };

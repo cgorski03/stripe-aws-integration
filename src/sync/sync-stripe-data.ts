@@ -8,11 +8,15 @@ import {
   GetCommand
 } from '@aws-sdk/lib-dynamodb';
 import type { Handler } from 'aws-lambda';
+import { CognitoIdentityProviderClient,
+  AdminUpdateUserAttributesCommand
+   } from '@aws-sdk/client-cognito-identity-provider';
+
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
-
+const cognito = new CognitoIdentityProviderClient({});
 const CUSTOMER_TABLE = (process.env.CUSTOMER_TABLE as string);
 
 // Types
@@ -52,7 +56,10 @@ export const handler: Handler<SyncStripeEvent, LambdaResponse> = async (event) =
     // If neither of these are included, we can't proceed
     if (!stripeCustomerId && !userId) {
       console.error('Cognito user ID or Stripe customer ID is required');
-      throw new Error('Customer ID is required');
+      return {
+        statusCode: 400,
+        error: 'Customer ID is required'
+      };
     }
 
     console.log('Querying DynamoDB for existing user record');
@@ -68,7 +75,10 @@ export const handler: Handler<SyncStripeEvent, LambdaResponse> = async (event) =
 
       if (!Item?.stripeCustomerId) {
         console.error('No Stripe customer ID found for user:', userId);
-        throw new Error('No Stripe customer ID found');
+        return {
+          statusCode: 404,
+          error: 'No Stripe customer ID found'
+        };
       }
       // Set the stripe customer ID to the one found in the database
       stripeCustomerId = Item.stripeCustomerId;
@@ -83,81 +93,117 @@ export const handler: Handler<SyncStripeEvent, LambdaResponse> = async (event) =
       }));
       existingUserId = Items?.[0]?.userId;
     }
-    
+
     if (!existingUserId) {
       console.error('No user record found for Stripe customer:', stripeCustomerId);
-      throw new Error('No user found for this Stripe customer');
-    }
-
-    console.log('Fetching subscription data from Stripe');
-    const subscriptions = await stripe.subscriptions.list({
-      customer: stripeCustomerId,
-      limit: 1,
-      status: 'all',
-      expand: ['data.default_payment_method'],
-    });
-
-    console.log('Stripe subscriptions found:', subscriptions.data.length);
-    let subData: StripeSubscriptionData;
-
-    if (subscriptions.data.length === 0) {
-      console.log('No active subscriptions found');
-      subData = {
-        subscriptionId: null,
-        status: 'none',
-        priceId: null,
-        currentPeriodEnd: null,
-        currentPeriodStart: null,
-        cancelAtPeriodEnd: false,
-        paymentMethod: null,
-      };
-    } else {
-      console.log('Processing subscription:', subscriptions.data[0].id);
-      const subscription = subscriptions.data[0];
-      const paymentMethod = subscription.default_payment_method;
-
-      subData = {
-        subscriptionId: subscription.id,
-        status: subscription.status,
-        priceId: subscription.items.data[0].price.id,
-        currentPeriodEnd: subscription.current_period_end,
-        currentPeriodStart: subscription.current_period_start,
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        paymentMethod:
-          paymentMethod && typeof paymentMethod !== 'string'
-            ? {
-                brand: paymentMethod.card?.brand ?? null,
-                last4: paymentMethod.card?.last4 ?? null,
-              }
-            : null,
+      return {
+        statusCode: 404,
+        error: 'No user found for this Stripe customer'
       };
     }
 
-    console.log('Updating DynamoDB with latest subscription data');
-    await docClient.send(new PutCommand({
-      TableName: CUSTOMER_TABLE,
-      Item: {
-        userId: existingUserId,        // Preserve existing userId
-        stripeCustomerId: stripeCustomerId,  // GSI
-        ...subData,
-        updatedAt: new Date().toISOString(),
-      },
-    }));
+    try {
+      console.log('Fetching subscription data from Stripe');
+      const subscriptions = await stripe.subscriptions.list({
+        customer: stripeCustomerId,
+        limit: 1,
+        status: 'all',
+        expand: ['data.default_payment_method'],
+      });
 
-    console.log('Sync completed successfully');
-    return {
-      success: true,
-      data: subData,
-    };
+      console.log('Stripe subscriptions found:', subscriptions.data.length);
+      let subData: StripeSubscriptionData;
+
+      if (subscriptions.data.length === 0) {
+        console.log('No active subscriptions found');
+        subData = {
+          subscriptionId: null,
+          status: 'none',
+          priceId: null,
+          currentPeriodEnd: null,
+          currentPeriodStart: null,
+          cancelAtPeriodEnd: false,
+          paymentMethod: null,
+        };
+      } else {
+        console.log('Processing subscription:', subscriptions.data[0].id);
+        const subscription = subscriptions.data[0];
+        const paymentMethod = subscription.default_payment_method;
+
+        subData = {
+          subscriptionId: subscription.id,
+          status: subscription.status,
+          priceId: subscription.items.data[0].price.id,
+          currentPeriodEnd: subscription.current_period_end,
+          currentPeriodStart: subscription.current_period_start,
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          paymentMethod:
+            paymentMethod && typeof paymentMethod !== 'string'
+              ? {
+                  brand: paymentMethod.card?.brand ?? null,
+                  last4: paymentMethod.card?.last4 ?? null,
+                }
+              : null,
+        };
+      }
+
+      console.log('Updating DynamoDB with latest subscription data');
+      await docClient.send(new PutCommand({
+        TableName: CUSTOMER_TABLE,
+        Item: {
+          userId: existingUserId,        // Preserve existing userId
+          stripeCustomerId: stripeCustomerId,  // GSI
+          ...subData,
+          updatedAt: new Date().toISOString(),
+        },
+      }));
+
+      // Update the Cognito attribute with the latest subscription data
+      console.log('Updating Cognito user attributes');
+      await cognito.send(new AdminUpdateUserAttributesCommand({
+        UserPoolId: process.env.COGNITO_USER_POOL_ID!,
+        Username: existingUserId,
+        UserAttributes: [
+          {
+            Name: 'custom:subscriptionStatus',
+            Value: subData.status
+          },
+          {
+            Name: 'custom:subscriptionEnd',
+            Value: subData.currentPeriodEnd?.toString() || ''
+          }
+        ]
+      }));
+    
+      console.log('Sync completed successfully');
+      return {
+        statusCode: 200,
+        data: subData,
+      };
+    } catch (stripeError) {
+      console.error('Stripe API error:', stripeError);
+      return {
+        statusCode: 502, // Bad Gateway for upstream service error
+        error: 'Failed to fetch Stripe data'
+      };
+    }
   } catch (error) {
-    console.error('Stripe sync error:', {
+    console.error('Sync error:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       customerId: event.stripeCustomerId
     });
     
+    // Handle specific error types
+    if (error instanceof Stripe.errors.StripeError) {
+      return {
+        statusCode: 502, // Bad Gateway for Stripe service errors
+        error: 'Stripe service error'
+      };
+    }
+
     return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      statusCode: 500, // Internal Server Error for unexpected errors
+      error: 'Internal server error'
     };
   }
 };
