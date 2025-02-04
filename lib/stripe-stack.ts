@@ -90,28 +90,7 @@ export class StripeFunctionsStack extends cdk.Stack {
         CUSTOMER_TABLE: customersTable.tableName,
       },
     });
-
-    const successSyncFunction = new lambda.Function(this, "StripeSuccessSync", {
-      runtime: lambda.Runtime.NODEJS_18_X,
-      handler: "success/success-stripe-sync.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../dist/success")),
-      timeout: cdk.Duration.seconds(30),  // Increase timeout
-      memorySize: 256,  // Increase memory
-      environment: {
-        STRIPE_SYNC_FUNCTION_NAME: syncFunction.functionName,
-        CUSTOMER_TABLE: customersTable.tableName,
-        APP_URL: process.env.APP_URL!,
-      },
-    });
-    const lambdaInvokePolicy = new iam.PolicyStatement({
-      effect: iam.Effect.ALLOW,
-      actions: ['lambda:InvokeFunction'],
-      resources: [syncFunction.functionArn]
-    });
     
-    successSyncFunction.addToRolePolicy(lambdaInvokePolicy);
-    // Grant DynamoDB read permissions
-    customersTable.grantReadData(successSyncFunction);
     // Allow webhook and success functions to invoke sync function
     syncFunction.grantInvoke(webhookFunction);
     // Grant DynamoDB read permissions to webhook function
@@ -120,7 +99,7 @@ export class StripeFunctionsStack extends cdk.Stack {
     // Store function ARNs
     this.checkoutFunction = checkoutFunction.functionArn;
     this.webhookFunction = webhookFunction.functionArn;
-    this.syncFunction = successSyncFunction.functionArn;
+    this.syncFunction = syncFunction.functionArn;
 
     // Add outputs
     new cdk.CfnOutput(this, "CheckoutFunction", {

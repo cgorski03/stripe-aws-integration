@@ -4,7 +4,8 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { 
   DynamoDBDocumentClient, 
   QueryCommand,
-  PutCommand 
+  PutCommand, 
+  GetCommand
 } from '@aws-sdk/lib-dynamodb';
 import type { Handler } from 'aws-lambda';
 
@@ -16,7 +17,8 @@ const CUSTOMER_TABLE = (process.env.CUSTOMER_TABLE as string);
 
 // Types
 type SyncStripeEvent = {
-  stripeCustomerId: string;
+  stripeCustomerId?: string;
+  userId?: string;
 };
 
 type StripeSubscriptionData = {
@@ -42,29 +44,45 @@ export const handler: Handler<SyncStripeEvent, LambdaResponse> = async (event) =
   console.log('Starting stripe data sync for customer:', event.stripeCustomerId);
   
   try {
-    const { stripeCustomerId } = event;
-
-    if (!stripeCustomerId) {
-      console.warn('Missing stripeCustomerId in event');
+    let { stripeCustomerId, userId } = event;
+    // We are either going to be given a stripeCustomerId or a userId
+    // If this is called from the webhook function, it would be the stripe customer ID
+    // If this is called from the frontend, it would be the userId
+    // If neither of these are included, we can't proceed
+    if (!stripeCustomerId && !userId) {
+      console.error('Cognito user ID or Stripe customer ID is required');
       throw new Error('Customer ID is required');
     }
 
     console.log('Querying DynamoDB for existing user record');
-    const { Items } = await docClient.send(new QueryCommand({
-      TableName: CUSTOMER_TABLE,
-      IndexName: 'stripeCustomerId-index',
-      KeyConditionExpression: 'stripeCustomerId = :stripeId',
-      ExpressionAttributeValues: {
-        ':stripeId': stripeCustomerId
+    let existingUserId = userId;
+    if (userId) {
+      // Fetch the stripeCustomerId from the DynamoDB table
+      const { Item } = await docClient.send(new GetCommand({
+        TableName: CUSTOMER_TABLE,
+        Key: {
+          userId: userId
+        }
+      }));
+
+      if (!Item?.stripeCustomerId) {
+        console.error('No Stripe customer ID found for user:', userId);
+        throw new Error('No Stripe customer ID found');
       }
-    }));
-
-    console.log('DynamoDB query result:', {
-      found: !!Items?.length,
-      userId: Items?.[0]?.userId
-    });
-
-    const existingUserId = Items?.[0]?.userId;
+      // Set the stripe customer ID to the one found in the database
+      stripeCustomerId = Item.stripeCustomerId;
+    } else {
+      const { Items } = await docClient.send(new QueryCommand({
+        TableName: CUSTOMER_TABLE,
+        IndexName: 'stripeCustomerId-index',
+        KeyConditionExpression: 'stripeCustomerId = :stripeId',
+        ExpressionAttributeValues: {
+          ':stripeId': stripeCustomerId
+        }
+      }));
+      existingUserId = Items?.[0]?.userId;
+    }
+    
     if (!existingUserId) {
       console.error('No user record found for Stripe customer:', stripeCustomerId);
       throw new Error('No user found for this Stripe customer');
