@@ -67,6 +67,7 @@ export class StripeFunctionsStack extends cdk.Stack {
     const syncFunction = new lambda.Function(this, "SyncStripeDataToKV", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "sync/sync-stripe-data.handler",
+      timeout: cdk.Duration.seconds(10),
       code: lambda.Code.fromAsset(path.join(__dirname, "../dist/sync")),
       environment: {
         STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
@@ -81,6 +82,7 @@ export class StripeFunctionsStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "webhook/stripe-webhook.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../dist/webhook")),
+      timeout: cdk.Duration.seconds(10),
       environment: {
         STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
         STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET!,
@@ -92,6 +94,7 @@ export class StripeFunctionsStack extends cdk.Stack {
     const successSyncFunction = new lambda.Function(this, "StripeSuccessSync", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "success/success-stripe-sync.handler",
+      timeout: cdk.Duration.seconds(10),
       code: lambda.Code.fromAsset(path.join(__dirname, "../dist/success")),
       environment: {
         STRIPE_SYNC_FUNCTION_NAME: syncFunction.functionName,
@@ -101,7 +104,7 @@ export class StripeFunctionsStack extends cdk.Stack {
 
     // Allow webhook and success functions to invoke sync function
     syncFunction.grantInvoke(webhookFunction);
-    successSyncFunction.grantInvoke(syncFunction);
+    syncFunction.grantInvoke(successSyncFunction);
 
     // Grant DynamoDB read permissions to webhook function
     customersTable.grantReadData(webhookFunction);
