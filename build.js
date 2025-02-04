@@ -1,8 +1,5 @@
-// build.js
 const esbuild = require('esbuild');
-const path = require('path');
 
-// Common esbuild configuration
 const baseConfig = {
   bundle: true,
   minify: true,
@@ -14,7 +11,7 @@ const baseConfig = {
     '@aws-sdk/client-lambda',
     '@aws-sdk/client-apigateway',
     '@aws-sdk/client-cloudformation',
-    // Add any other AWS SDK v3 packages you're using
+    '@aws-sdk/client-lambda'
   ],
   format: 'cjs',
 };

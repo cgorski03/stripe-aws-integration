@@ -94,18 +94,26 @@ export class StripeFunctionsStack extends cdk.Stack {
     const successSyncFunction = new lambda.Function(this, "StripeSuccessSync", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "success/success-stripe-sync.handler",
-      timeout: cdk.Duration.seconds(10),
       code: lambda.Code.fromAsset(path.join(__dirname, "../dist/success")),
+      timeout: cdk.Duration.seconds(30),  // Increase timeout
+      memorySize: 256,  // Increase memory
       environment: {
         STRIPE_SYNC_FUNCTION_NAME: syncFunction.functionName,
         CUSTOMER_TABLE: customersTable.tableName,
+        APP_URL: process.env.APP_URL!,
       },
     });
-
+    const lambdaInvokePolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['lambda:InvokeFunction'],
+      resources: [syncFunction.functionArn]
+    });
+    
+    successSyncFunction.addToRolePolicy(lambdaInvokePolicy);
+    // Grant DynamoDB read permissions
+    customersTable.grantReadData(successSyncFunction);
     // Allow webhook and success functions to invoke sync function
     syncFunction.grantInvoke(webhookFunction);
-    syncFunction.grantInvoke(successSyncFunction);
-
     // Grant DynamoDB read permissions to webhook function
     customersTable.grantReadData(webhookFunction);
 
