@@ -34,8 +34,9 @@ type StripeSubscriptionData = {
   } | null;
 };
 
+
 type LambdaResponse = {
-  success: boolean;
+  statusCode: number;
   data?: StripeSubscriptionData;
   error?: string;
 };
