@@ -3,6 +3,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import path from "path";
 import * as dotenv from "dotenv";
+import * as iam from "aws-cdk-lib/aws-iam";
 
 dotenv.config();
 
@@ -13,6 +14,7 @@ const requiredEnvVars = [
   "APP_URL",
   "CUSTOMER_TABLE",
   "STRIPE_WEBHOOK_SECRET",
+  "COGNITO_USER_POOL_ID",
 ] as const;
 
 requiredEnvVars.forEach((envVar) => {
@@ -71,9 +73,15 @@ export class StripeFunctionsStack extends cdk.Stack {
       environment: {
         STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
         CUSTOMER_TABLE: customersTable.tableName,
+        COGNITO_USER_POOL_ID: process.env.COGNITO_USER_POOL_ID!,
       },
     });
-
+    
+    syncFunction.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['cognito-idp:AdminUpdateUserAttributes'],
+      resources: [`arn:aws:cognito-idp:${this.region}:${this.account}:userpool/${process.env.COGNITO_USER_POOL_ID}`]
+    }));
     // Grant DynamoDB permissions to sync function
     customersTable.grantReadWriteData(syncFunction);
 
@@ -90,9 +98,9 @@ export class StripeFunctionsStack extends cdk.Stack {
       },
     });
     
-    // Allow webhook and success functions to invoke sync function
+    // Allow webhook handling function to invoke sync function
     syncFunction.grantInvoke(webhookFunction);
-    // Grant DynamoDB read permissions to webhook function
+    // Allow the webhook function to read from the customers table
     customersTable.grantReadData(webhookFunction);
 
     // Store function ARNs
