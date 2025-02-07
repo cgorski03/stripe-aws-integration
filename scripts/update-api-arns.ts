@@ -42,7 +42,7 @@ async function updateApiRoutes() {
       throw new Error('Function ARNs not found in stack outputs');
     }
 
-    console.log('Found ARNs:', { checkoutArn, webhookArn, syncArn });
+    console.log('Found ARNs:', { checkoutArn, webhookArn, syncArn, manageBillingFunction });
 
     // Get resource IDs
     const { items: resources } = await apigateway.send(
