@@ -36,8 +36,9 @@ async function updateApiRoutes() {
     const checkoutArn = stack.Outputs?.find(o => o.OutputKey === 'CheckoutFunction')?.OutputValue;
     const webhookArn = stack.Outputs?.find(o => o.OutputKey === 'WebhookFunction')?.OutputValue;
     const syncArn = stack.Outputs?.find(o => o.OutputKey === 'SyncFunction')?.OutputValue;
+    const manageBillingFunction = stack.Outputs?.find(o => o.OutputKey === 'ManageBillingFunction')?.OutputValue;
 
-    if (!checkoutArn || !webhookArn || !syncArn) {
+    if (!checkoutArn || !webhookArn || !syncArn || !manageBillingFunction) {
       throw new Error('Function ARNs not found in stack outputs');
     }
 
@@ -53,8 +54,9 @@ async function updateApiRoutes() {
     const checkoutResource = resources?.find(r => r.path === '/subscription/checkout');
     const webhookResource = resources?.find(r => r.path === '/subscription/webhook');
     const syncResource = resources?.find(r => r.path === '/subscription/sync');
+    const manageBillingResource = resources?.find(r => r.path === '/subscription/manage');
 
-    if (!checkoutResource?.id || !webhookResource?.id || !syncResource?.id) {
+    if (!checkoutResource?.id || !webhookResource?.id || !syncResource?.id || !manageBillingResource?.id) {
       throw new Error('Resource IDs not found');
     }
 
@@ -69,6 +71,21 @@ async function updateApiRoutes() {
             op: 'replace',
             path: '/uri',
             value: `arn:aws:apigateway:${config.region}:lambda:path/2015-03-31/functions/${checkoutArn}/invocations`
+          }
+        ]
+      })
+    );
+    
+    await apigateway.send(
+      new UpdateIntegrationCommand({
+        restApiId: process.env.API_ID,
+        resourceId: manageBillingResource.id,
+        httpMethod: 'POST',
+        patchOperations: [
+          {
+            op: 'replace',
+            path: '/uri',
+            value: `arn:aws:apigateway:${config.region}:lambda:path/2015-03-31/functions/${manageBillingFunction}/invocations`
           }
         ]
       })

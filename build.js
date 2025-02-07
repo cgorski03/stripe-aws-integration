@@ -26,6 +26,11 @@ async function buildFunctions() {
       entryPoints: ['src/checkout/create-checkout.ts'],
       outfile: 'dist/checkout/create-checkout.js',
     });
+    await esbuild.build({
+      ...baseConfig,
+      entryPoints: ['src/manage/manage-subscription.ts'],
+      outfile: 'dist/manage/manage-subscription.js',
+    });
 
     // Build webhook function
     await esbuild.build({

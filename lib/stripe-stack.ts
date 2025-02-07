@@ -27,6 +27,7 @@ export class StripeFunctionsStack extends cdk.Stack {
   public readonly checkoutFunction: string;
   public readonly webhookFunction: string;
   public readonly syncFunction: string;
+  public readonly manageBillingFunction: string;
 
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -61,9 +62,22 @@ export class StripeFunctionsStack extends cdk.Stack {
         CUSTOMER_TABLE: customersTable.tableName,
       },
     });
-
     // Grant DynamoDB permissions to checkout function
     customersTable.grantReadWriteData(checkoutFunction);
+
+    const manageBillingFunction = new lambda.Function(this, "StripeManageBilling", {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: "checkout/create-checkout.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../dist/manage")),
+      environment: {
+        STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
+        APP_URL: process.env.APP_URL!,
+        CUSTOMER_TABLE: customersTable.tableName,
+      },
+    });
+    // This function only needs read
+    customersTable.grantReadData(manageBillingFunction);
+
 
     const syncFunction = new lambda.Function(this, "SyncStripeDataToKV", {
       runtime: lambda.Runtime.NODEJS_18_X,
@@ -107,11 +121,17 @@ export class StripeFunctionsStack extends cdk.Stack {
     this.checkoutFunction = checkoutFunction.functionArn;
     this.webhookFunction = webhookFunction.functionArn;
     this.syncFunction = syncFunction.functionArn;
+    this.manageBillingFunction = manageBillingFunction.functionArn;
 
     // Add outputs
     new cdk.CfnOutput(this, "CheckoutFunction", {
       value: this.checkoutFunction,
       exportName: "checkoutFunction",
+    });
+
+    new cdk.CfnOutput(this, "ManageBillingFunction", {
+      value: this.manageBillingFunction,
+      exportName: "manageBillingFunction",
     });
 
     new cdk.CfnOutput(this, "WebhookFunction", {
@@ -123,6 +143,7 @@ export class StripeFunctionsStack extends cdk.Stack {
       value: this.syncFunction,
       exportName: "syncFunction",
     });
+    
 
     new cdk.CfnOutput(this, "CustomersTableName", {
       value: customersTable.tableName,
