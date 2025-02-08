@@ -171,6 +171,10 @@ export const handler: Handler<SyncStripeEvent, LambdaResponse> = async (event) =
           {
             Name: 'custom:subscriptionEnd',
             Value: subData.currentPeriodEnd?.toString() || ''
+          },
+          {
+            Name: 'custom:cancelAtPeriodEnd',
+            Value: subData.cancelAtPeriodEnd.toString()
           }
         ]
       }));
