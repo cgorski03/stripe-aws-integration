@@ -67,7 +67,7 @@ export class StripeFunctionsStack extends cdk.Stack {
 
     const manageBillingFunction = new lambda.Function(this, "StripeManageBilling", {
       runtime: lambda.Runtime.NODEJS_18_X,
-      handler: "checkout/create-checkout.handler",
+      handler: "manage/manage-subscription.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../dist/manage")),
       environment: {
         STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
