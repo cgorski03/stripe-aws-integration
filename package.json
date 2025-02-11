@@ -5,7 +5,9 @@
     "deploy": "npm run build && cdk deploy",
     "synth": "cdk synth",
     "update-api": "ts-node scripts/update-api-arns.ts",
-    "deploy:all": "npm run build && cdk deploy && npm run update-api"
+    "deploy:all": "npm run build && cdk deploy && npm run update-api",
+    "deploy:prod": "export ENV_STAGE=prod && npm run deploy:all",
+    "deploy:dev": "export ENV_STAGE=dev && npm run deploy:all"
   },
   "devDependencies": {
     "@aws-sdk/client-api-gateway": "^3.741.0",

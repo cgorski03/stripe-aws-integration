@@ -5,7 +5,17 @@ import path from "path";
 import * as dotenv from "dotenv";
 import * as iam from "aws-cdk-lib/aws-iam";
 
-dotenv.config();
+// Determine the environment
+const environment = process.env.ENV_STAGE || "dev"; // Default to 'development'
+
+// Load environment variables based on the environment
+if (environment === "prod") {
+  dotenv.config({ path: ".env.prod" });
+  console.log("Loading production environment variables");
+} else {
+  dotenv.config({ path: ".env.dev" });
+  console.log("Loading development environment variables");
+}
 
 // Validate environment variables
 const requiredEnvVars = [
@@ -37,7 +47,10 @@ export class StripeFunctionsStack extends cdk.Stack {
       tableName: process.env.CUSTOMER_TABLE,
       partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN, // RETAIN for production data
+      removalPolicy:
+        environment === "prod"
+          ? cdk.RemovalPolicy.RETAIN
+          : cdk.RemovalPolicy.DESTROY, // RETAIN for production data
     });
 
     // Add GSI for stripeCustomerId
@@ -65,19 +78,22 @@ export class StripeFunctionsStack extends cdk.Stack {
     // Grant DynamoDB permissions to checkout function
     customersTable.grantReadWriteData(checkoutFunction);
 
-    const manageBillingFunction = new lambda.Function(this, "StripeManageBilling", {
-      runtime: lambda.Runtime.NODEJS_18_X,
-      handler: "manage/manage-subscription.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../dist/manage")),
-      environment: {
-        STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
-        APP_URL: process.env.APP_URL!,
-        CUSTOMER_TABLE: customersTable.tableName,
+    const manageBillingFunction = new lambda.Function(
+      this,
+      "StripeManageBilling",
+      {
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: "manage/manage-subscription.handler",
+        code: lambda.Code.fromAsset(path.join(__dirname, "../dist/manage")),
+        environment: {
+          STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
+          APP_URL: process.env.APP_URL!,
+          CUSTOMER_TABLE: customersTable.tableName,
+        },
       },
-    });
+    );
     // This function only needs read
     customersTable.grantReadData(manageBillingFunction);
-
 
     const syncFunction = new lambda.Function(this, "SyncStripeDataToKV", {
       runtime: lambda.Runtime.NODEJS_18_X,
@@ -90,12 +106,16 @@ export class StripeFunctionsStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: process.env.COGNITO_USER_POOL_ID!,
       },
     });
-    
-    syncFunction.addToRolePolicy(new iam.PolicyStatement({
-      effect: iam.Effect.ALLOW,
-      actions: ['cognito-idp:AdminUpdateUserAttributes'],
-      resources: [`arn:aws:cognito-idp:${this.region}:${this.account}:userpool/${process.env.COGNITO_USER_POOL_ID}`]
-    }));
+
+    syncFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["cognito-idp:AdminUpdateUserAttributes"],
+        resources: [
+          `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/${process.env.COGNITO_USER_POOL_ID}`,
+        ],
+      }),
+    );
     // Grant DynamoDB permissions to sync function
     customersTable.grantReadWriteData(syncFunction);
 
@@ -111,7 +131,7 @@ export class StripeFunctionsStack extends cdk.Stack {
         CUSTOMER_TABLE: customersTable.tableName,
       },
     });
-    
+
     // Allow webhook handling function to invoke sync function
     syncFunction.grantInvoke(webhookFunction);
     // Allow the webhook function to read from the customers table
@@ -124,30 +144,29 @@ export class StripeFunctionsStack extends cdk.Stack {
     this.manageBillingFunction = manageBillingFunction.functionArn;
 
     // Add outputs
-    new cdk.CfnOutput(this, "CheckoutFunction", {
+    new cdk.CfnOutput(this, `CheckoutFunction`, {
       value: this.checkoutFunction,
-      exportName: "checkoutFunction",
+      exportName: `checkoutFunction-${environment}`,
     });
 
-    new cdk.CfnOutput(this, "ManageBillingFunction", {
+    new cdk.CfnOutput(this, `ManageBillingFunction`, {
       value: this.manageBillingFunction,
-      exportName: "manageBillingFunction",
+      exportName: `manageBillingFunction-${environment}`,
     });
 
-    new cdk.CfnOutput(this, "WebhookFunction", {
+    new cdk.CfnOutput(this, `WebhookFunction`, {
       value: this.webhookFunction,
-      exportName: "webhookFunction",
+      exportName: `webhookFunction-${environment}`,
     });
 
-    new cdk.CfnOutput(this, "SyncFunction", {
+    new cdk.CfnOutput(this, `SyncFunction`, {
       value: this.syncFunction,
-      exportName: "syncFunction",
+      exportName: `syncFunction-${environment}`,
     });
-    
 
-    new cdk.CfnOutput(this, "CustomersTableName", {
+    new cdk.CfnOutput(this, `CustomersTableName`, {
       value: customersTable.tableName,
-      exportName: "customersTableName",
+      exportName: `customersTableName-${environment}`,
     });
   }
 }

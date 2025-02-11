@@ -11,7 +11,17 @@ import {
 } from "@aws-sdk/client-cloudformation";
 import * as dotenv from 'dotenv';
 
-dotenv.config();
+// Determine the environment
+const environment = process.env.ENV_STAGE || "dev";
+
+// Load environment variables based on the environment
+if (environment === "prod") {
+  dotenv.config({ path: ".env.prod" });
+  console.log("Loading production environment variables");
+} else {
+  dotenv.config({ path: ".env.dev" });
+  console.log("Loading development environment variables");
+}
 
 const config = {
   region: process.env.AWS_REGION || 'us-east-1'
@@ -25,7 +35,7 @@ async function updateApiRoutes() {
     // Get stack outputs
     const { Stacks } = await cloudformation.send(
       new DescribeStacksCommand({
-        StackName: 'StripeBackendStack'
+        StackName: `StripeBackendStack-${environment}`
       })
     );
 
@@ -33,10 +43,10 @@ async function updateApiRoutes() {
     if (!stack) throw new Error('Stack not found');
 
     // Get function ARNs from stack outputs
-    const checkoutArn = stack.Outputs?.find(o => o.OutputKey === 'CheckoutFunction')?.OutputValue;
-    const webhookArn = stack.Outputs?.find(o => o.OutputKey === 'WebhookFunction')?.OutputValue;
-    const syncArn = stack.Outputs?.find(o => o.OutputKey === 'SyncFunction')?.OutputValue;
-    const manageBillingFunction = stack.Outputs?.find(o => o.OutputKey === 'ManageBillingFunction')?.OutputValue;
+    const checkoutArn = stack.Outputs?.find(o => o.ExportName === `checkoutFunction-${environment}`)?.OutputValue;
+    const webhookArn = stack.Outputs?.find(o => o.ExportName === `webhookFunction-${environment}`)?.OutputValue;
+    const syncArn = stack.Outputs?.find(o => o.ExportName === `syncFunction-${environment}`)?.OutputValue;
+    const manageBillingFunction = stack.Outputs?.find(o => o.ExportName === `manageBillingFunction-${environment}`)?.OutputValue;
 
     if (!checkoutArn || !webhookArn || !syncArn || !manageBillingFunction) {
       throw new Error('Function ARNs not found in stack outputs');
@@ -127,7 +137,7 @@ async function updateApiRoutes() {
     await apigateway.send(
       new CreateDeploymentCommand({
         restApiId: process.env.API_ID,
-        stageName: process.env.API_STAGE || 'prod',
+        stageName: environment,
         description: 'Updated Lambda integrations'
       })
     );

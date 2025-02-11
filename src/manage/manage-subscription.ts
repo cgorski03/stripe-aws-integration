@@ -81,7 +81,7 @@ export const handler = async (
     console.log('Creating billing portal session');
     const session = await stripe.billingPortal.sessions.create({
       customer: customerResult.Item.stripeCustomerId,
-      return_url: process.env.APP_URL,
+      return_url: process.env.APP_URL + '/settings',
     });
 
     console.log('Successfully created billing portal session', { 
